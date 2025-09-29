@@ -167,63 +167,83 @@ class KGSearch {
       return
     }
 
-    // 検索結果を元のKGSearch風のテーブル形式で表示
-    const resultsHtml = results.map((result, index) => {
+    // 元のKG Searchと同じテーブル形式で表示
+    const tableHeader = !isAppend ? `
+      <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table class="w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200">
+                QID
+              </th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                ラベル
+              </th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                詳細
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+    ` : ''
+
+    const tableFooter = !isAppend ? `
+          </tbody>
+        </table>
+      </div>
+    ` : ''
+
+    const resultsRows = results.map((result, index) => {
       const globalIndex = this.currentOffset + index + 1
       return `
-        <div class="result-item border-b border-gray-100 last:border-b-0" id="item-${result.id}">
-          <div class="py-3 hover:bg-gray-50 transition duration-200">
-            <div class="flex items-center justify-between">
-              <div class="flex-grow">
-                <div class="flex items-start space-x-3">
-                  <div class="text-blue-600 font-mono text-sm min-w-0 flex-shrink-0">
-                    ${this.escapeHtml(result.id)}
-                  </div>
-                  <div class="min-w-0 flex-grow">
-                    <div class="font-medium text-gray-900 mb-1">
-                      ${this.escapeHtml(result.label || result.id)}
-                    </div>
-                    <div class="text-sm text-gray-600">
-                      ${this.escapeHtml(result.description || '')}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center space-x-2 flex-shrink-0">
-                <button 
-                  onclick="kgSearch.toggleEntityDetails('${result.id}')"
-                  class="px-3 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-full transition duration-200"
-                >
-                  <i class="fas fa-chevron-down mr-1" id="chevron-${result.id}"></i>
-                  詳細
-                </button>
-                ${result.concepturi ? `
-                  <a href="${this.escapeHtml(result.concepturi)}" target="_blank" 
-                     class="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 transition duration-200">
-                    <i class="fas fa-external-link-alt"></i>
-                  </a>
-                ` : ''}
-              </div>
+        <tr class="hover:bg-gray-50 transition duration-200" id="item-${result.id}">
+          <td class="px-4 py-3 text-sm font-mono text-blue-600 border-r border-gray-200">
+            <a href="${this.escapeHtml(result.concepturi || '#')}" target="_blank" 
+               class="hover:text-blue-800">
+              ${this.escapeHtml(result.id)}
+            </a>
+          </td>
+          <td class="px-4 py-3">
+            <div class="text-sm font-medium text-gray-900">
+              ${this.escapeHtml(result.label || result.id)}
             </div>
-            
-            <!-- 詳細情報表示エリア -->
-            <div id="details-${result.id}" class="hidden mt-4 ml-6 pl-4 border-l-2 border-blue-200 bg-blue-50 rounded-r-lg">
-              <div class="py-3">
+            <div class="text-sm text-gray-500">
+              ${this.escapeHtml(result.description || '')}
+            </div>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <button 
+              onclick="kgSearch.toggleEntityDetails('${result.id}')"
+              class="inline-flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition duration-200"
+            >
+              詳細
+              <i class="fas fa-chevron-down ml-1" id="chevron-${result.id}"></i>
+            </button>
+          </td>
+        </tr>
+        <tr id="details-row-${result.id}" class="hidden">
+          <td colspan="3" class="px-0 py-0">
+            <div id="details-${result.id}" class="bg-blue-50 border-t border-gray-200">
+              <div class="px-6 py-4">
                 <div class="flex items-center mb-2">
                   <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
                   <span class="text-blue-600 text-sm">詳細情報を読み込み中...</span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </td>
+        </tr>
       `
     }).join('')
 
     if (isAppend) {
-      resultsContent.insertAdjacentHTML('beforeend', resultsHtml)
+      // 既存のテーブルに行を追加
+      const tbody = resultsContent.querySelector('tbody')
+      if (tbody) {
+        tbody.insertAdjacentHTML('beforeend', resultsRows)
+      }
     } else {
-      resultsContent.innerHTML = resultsHtml
+      resultsContent.innerHTML = tableHeader + resultsRows + tableFooter
     }
 
     // ページネーション
@@ -231,7 +251,7 @@ class KGSearch {
       pagination.innerHTML = hasMore ? `
         <button 
           onclick="kgSearch.performSearch(${this.currentOffset + 20})"
-          class="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 rounded text-sm transition duration-200">
+          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition duration-200">
           <i class="fas fa-chevron-down mr-2"></i>
           さらに読み込む（20件）
         </button>
@@ -240,26 +260,27 @@ class KGSearch {
   }
 
   async toggleEntityDetails(entityId) {
-    const detailsElement = document.getElementById(`details-${entityId}`)
+    const detailsRow = document.getElementById(`details-row-${entityId}`)
     const chevronElement = document.getElementById(`chevron-${entityId}`)
     
-    if (!detailsElement) return
+    if (!detailsRow) return
     
     if (this.expandedItems.has(entityId)) {
       // 閉じる
-      detailsElement.classList.add('hidden')
+      detailsRow.classList.add('hidden')
       chevronElement?.classList.remove('fa-chevron-up')
       chevronElement?.classList.add('fa-chevron-down')
       this.expandedItems.delete(entityId)
     } else {
       // 開く
-      detailsElement.classList.remove('hidden')
+      detailsRow.classList.remove('hidden')
       chevronElement?.classList.remove('fa-chevron-down')
       chevronElement?.classList.add('fa-chevron-up')
       this.expandedItems.add(entityId)
       
       // まだ詳細情報を取得していない場合は取得
-      if (!detailsElement.dataset.loaded) {
+      const detailsElement = document.getElementById(`details-${entityId}`)
+      if (detailsElement && !detailsElement.dataset.loaded) {
         await this.loadEntityDetails(entityId)
       }
     }

@@ -112,11 +112,10 @@ app.get('/', (c) => {
 
 
 
-// API: Wikidata検索
+// API: Wikidata検索（元のKG Search方式）
 app.get('/api/search', async (c) => {
   try {
     const query = c.req.query('q') || ''
-    const mode = c.req.query('mode') || 'label-partial'
     const lang = c.req.query('lang') || 'ja'
     const limit = parseInt(c.req.query('limit') || '50')
     const offset = parseInt(c.req.query('offset') || '0')
@@ -125,28 +124,62 @@ app.get('/api/search', async (c) => {
       return c.json({ error: '検索キーワードを入力してください' }, 400)
     }
 
-    // Wikimedia API を使用してエンティティを検索
-    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(query)}&language=${lang}&limit=${limit}&continue=${offset}&format=json&origin=*`
+    // Step 1: Wikimedia API でエンティティIDを取得
+    const entityIds = await getWikidataEntityIds(query, lang, limit, offset)
     
-    const response = await fetch(searchUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'KGSearchWD-Improved/1.0 (https://github.com/user/kg-search-wd-improved)',
-        'Accept': 'application/json'
-      }
-    })
-    
-    if (!response.ok) {
-      console.error(`Wikidata API error: ${response.status} - ${response.statusText}`)
-      throw new Error(`Wikidata API request failed: ${response.status}`)
+    if (entityIds.length === 0) {
+      return c.json({
+        success: true,
+        results: [],
+        hasMore: false
+      })
     }
 
-    const data = await response.json()
+    // Step 2: SPARQLクエリでエンティティの詳細情報を取得（元のKG Search方式）
+    const sparqlQuery = `
+      SELECT DISTINCT ?item ?itemLabel ?itemDescription WHERE {
+        VALUES ?item { ${entityIds.map(id => `wd:${id}`).join(' ')} }
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
+      }
+      ORDER BY ?itemLabel
+      LIMIT ${limit}
+    `
+
+    const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparqlQuery)}&format=json`
+    
+    const sparqlResponse = await fetch(sparqlUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/sparql-results+json',
+        'User-Agent': 'KGSearchWD-Improved/1.0 (https://github.com/user/kg-search-wd-improved)'
+      }
+    })
+
+    if (!sparqlResponse.ok) {
+      console.error(`SPARQL API error: ${sparqlResponse.status} - ${sparqlResponse.statusText}`)
+      throw new Error(`SPARQL query failed: ${sparqlResponse.status}`)
+    }
+
+    const sparqlData = await sparqlResponse.json()
+    
+    // 結果を元のKG Search形式に変換
+    const results = sparqlData.results?.bindings?.map(binding => {
+      const item = binding.item?.value || ''
+      const itemId = item.replace('http://www.wikidata.org/entity/', '')
+      
+      return {
+        id: itemId,
+        label: binding.itemLabel?.value || itemId,
+        description: binding.itemDescription?.value || '',
+        concepturi: item
+      }
+    }) || []
     
     return c.json({
       success: true,
-      results: data.search || [],
-      hasMore: data.search && data.search.length >= limit
+      results: results,
+      hasMore: entityIds.length >= limit,
+      entityIds: entityIds
     })
   } catch (error) {
     console.error('Search error:', error)
@@ -156,7 +189,33 @@ app.get('/api/search', async (c) => {
   }
 })
 
-// API: エンティティ詳細取得（日本語ラベル優先）
+// Helper function: Wikimedia APIでエンティティIDを取得
+async function getWikidataEntityIds(query: string, lang: string, limit: number, offset: number): Promise<string[]> {
+  try {
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(query)}&language=${lang}&limit=${limit}&continue=${offset}&format=json&origin=*`
+    
+    const response = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'KGSearchWD-Improved/1.0 (https://github.com/user/kg-search-wd-improved)',
+        'Accept': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error(`Wikidata search API error: ${response.status}`)
+      return []
+    }
+
+    const data = await response.json()
+    return (data.search || []).map((item: any) => item.id).filter(Boolean)
+  } catch (error) {
+    console.error('Entity search error:', error)
+    return []
+  }
+}
+
+// API: エンティティ詳細取得（元のKG Search方式）
 app.get('/api/entity/:id', async (c) => {
   try {
     const entityId = c.req.param('id')
@@ -166,46 +225,16 @@ app.get('/api/entity/:id', async (c) => {
       return c.json({ error: '無効なエンティティIDです' }, 400)
     }
 
-    // 基本情報と主要プロパティを取得するSPARQLクエリ
+    // 元のKG Searchと同じ形式のSPARQLクエリ
     const sparqlQuery = `
-      SELECT DISTINCT ?prop ?propLabel ?propJaLabel ?value ?valueLabel ?valueJaLabel ?valueDescription WHERE {
+      SELECT DISTINCT ?prop ?propLabel ?value ?valueLabel WHERE {
         wd:${entityId} ?prop ?value .
         ?property wikibase:directClaim ?prop .
-        
-        # プロパティラベル（日本語優先）
-        OPTIONAL { ?property rdfs:label ?propJaLabel . FILTER(LANG(?propJaLabel) = "ja") }
-        OPTIONAL { ?property rdfs:label ?propLabel . FILTER(LANG(?propLabel) = "en") }
-        
-        # 値のラベル（日本語優先）
-        OPTIONAL { ?value rdfs:label ?valueJaLabel . FILTER(LANG(?valueJaLabel) = "ja") }
-        OPTIONAL { ?value rdfs:label ?valueLabel . FILTER(LANG(?valueLabel) = "en") }
-        OPTIONAL { ?value schema:description ?valueDescription . FILTER(LANG(?valueDescription) = "ja") }
-        
-        # 重要なプロパティに絞る
-        FILTER(?prop IN (
-          wdt:P31,    # instance of (分類)
-          wdt:P279,   # subclass of (上位クラス)
-          wdt:P17,    # country (国)
-          wdt:P131,   # located in (所在地)
-          wdt:P19,    # place of birth (出生地)
-          wdt:P20,    # place of death (死去地)
-          wdt:P27,    # country of citizenship (国籍)
-          wdt:P106,   # occupation (職業)
-          wdt:P569,   # date of birth (生年月日)
-          wdt:P570,   # date of death (没年月日)
-          wdt:P18,    # image (画像)
-          wdt:P154,   # logo image (ロゴ)
-          wdt:P625,   # coordinate location (座標)
-          wdt:P856,   # official website (公式サイト)
-          wdt:P571,   # inception (設立年)
-          wdt:P576,   # dissolved (解散年)
-          wdt:P1416,  # affiliation (所属)
-          wdt:P108    # employer (雇用者)
-        ))
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
         FILTER(!isBlank(?value))
       }
       ORDER BY ?prop
-      LIMIT 30
+      LIMIT 100
     `
 
     const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparqlQuery)}&format=json`
