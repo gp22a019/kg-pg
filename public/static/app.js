@@ -692,14 +692,38 @@ class KGSearch {
         let valueDescription = value.valueDescription?.value || ''
         
         const isUrl = value.value?.value?.startsWith('http')
-        const isImage = isUrl && (value.value.value.includes('.jpg') || value.value.value.includes('.png') || value.value.value.includes('.jpeg'))
+        const isImage = this.isImageUrl(value.value?.value)
         const isWikidataEntity = this.isWikidataEntity(value.value?.value)
         
         if (isImage) {
+          const imageUrl = value.value.value
+          const uniqueImageId = `image-${Date.now()}-${Math.random().toString(36).substring(7)}`
+          
           return `
             <div class="mb-2">
-              <img src="${this.escapeHtml(value.value.value)}" alt="${this.escapeHtml(valueText)}" 
-                   class="max-w-32 max-h-24 object-cover rounded border">
+              <div class="image-container relative">
+                <img 
+                  id="${uniqueImageId}"
+                  src="${this.escapeHtml(imageUrl)}" 
+                  alt="${this.escapeHtml(valueText)}" 
+                  class="max-w-40 max-h-32 object-cover rounded border shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  onclick="kgSearch.openImageModal('${this.escapeHtml(imageUrl)}', '${this.escapeHtml(valueText)}')"
+                  onerror="kgSearch.handleImageError('${uniqueImageId}', '${this.escapeHtml(imageUrl)}')"
+                  loading="lazy"
+                />
+                <div class="image-loading hidden absolute inset-0 bg-gray-100 rounded border flex items-center justify-center">
+                  <div class="text-gray-500 text-xs">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>
+                    読み込み中...
+                  </div>
+                </div>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                <i class="fas fa-image mr-1"></i>
+                <a href="${this.escapeHtml(imageUrl)}" target="_blank" class="text-blue-500 hover:text-blue-700">
+                  画像リンク
+                </a>
+              </div>
             </div>
           `
         } else if (isWikidataEntity) {
@@ -777,6 +801,33 @@ class KGSearch {
     if (!propertyUri) return null
     const match = propertyUri.match(/P\d+$/)
     return match ? match[0] : null
+  }
+
+  // 画像URLかどうかを判定（拡張版）
+  isImageUrl(url) {
+    if (!url || typeof url !== 'string') return false
+    
+    // 一般的な画像拡張子
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.tif']
+    const lowerUrl = url.toLowerCase()
+    
+    // 直接的な画像拡張子チェック
+    if (imageExtensions.some(ext => lowerUrl.includes(ext))) {
+      return true
+    }
+    
+    // Wikimedia Commons の特別なパターン
+    if (url.includes('commons.wikimedia.org') || url.includes('upload.wikimedia.org')) {
+      return true
+    }
+    
+    // その他の画像ホスティングサービス
+    const imageHosts = ['imgur.com', 'flickr.com', 'photobucket.com']
+    if (imageHosts.some(host => url.includes(host))) {
+      return true
+    }
+    
+    return false
   }
 
   // Wikidataエンティティかどうかを判定
@@ -911,6 +962,79 @@ class KGSearch {
     if (errorArea) {
       errorArea.classList.add('hidden')
     }
+  }
+
+  // 画像エラーハンドリング
+  handleImageError(imageId, originalUrl) {
+    const img = document.getElementById(imageId)
+    if (!img) return
+    
+    // 代替表示に変更
+    const container = img.parentElement
+    if (container) {
+      container.innerHTML = `
+        <div class="max-w-40 max-h-32 bg-gray-100 rounded border flex items-center justify-center p-4">
+          <div class="text-center text-gray-500 text-xs">
+            <i class="fas fa-image-slash text-lg mb-2"></i>
+            <div>画像を読み込めませんでした</div>
+            <a href="${this.escapeHtml(originalUrl)}" target="_blank" class="text-blue-500 hover:text-blue-700 mt-1 inline-block">
+              <i class="fas fa-external-link-alt mr-1"></i>
+              元のリンク
+            </a>
+          </div>
+        </div>
+      `
+    }
+  }
+
+  // 画像拡大表示モーダル
+  openImageModal(imageUrl, altText) {
+    // 既存のモーダルがあれば削除
+    const existingModal = document.getElementById('image-modal')
+    if (existingModal) {
+      existingModal.remove()
+    }
+
+    // モーダルを作成
+    const modal = document.createElement('div')
+    modal.id = 'image-modal'
+    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        modal.remove()
+      }
+    }
+
+    modal.innerHTML = `
+      <div class="relative max-w-4xl max-h-full p-4">
+        <button 
+          onclick="document.getElementById('image-modal').remove()"
+          class="absolute top-2 right-2 text-white hover:text-gray-300 text-2xl z-10 bg-black bg-opacity-50 rounded-full w-8 h-8 flex items-center justify-center"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+        <img 
+          src="${this.escapeHtml(imageUrl)}" 
+          alt="${this.escapeHtml(altText)}" 
+          class="max-w-full max-h-full object-contain rounded shadow-lg"
+          onclick="event.stopPropagation()"
+        />
+        <div class="text-white text-center mt-2 text-sm">
+          ${this.escapeHtml(altText || '画像')}
+        </div>
+      </div>
+    `
+
+    document.body.appendChild(modal)
+
+    // ESCキーでモーダルを閉じる
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove()
+        document.removeEventListener('keydown', handleEscape)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
   }
 
   escapeHtml(text) {

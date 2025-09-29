@@ -23,7 +23,9 @@ app.get('/', (c) => {
           {/* ヘッダー */}
           <header class="pt-8 pb-6 text-center">
             <h1 class="text-3xl font-normal text-gray-800 mb-2">
-              Wikidata検索
+              <a href="/" class="hover:text-gray-600 transition duration-200 cursor-pointer">
+                Wikidata検索
+              </a>
             </h1>
             <p class="text-sm text-gray-500">
               知識グラフから情報を検索
@@ -131,7 +133,9 @@ app.get('/advanced', (c) => {
           <header class="pt-8 pb-6">
             <div class="flex items-center justify-between">
               <h1 class="text-3xl font-normal text-gray-800">
-                Wikidata詳細検索
+                <a href="/" class="hover:text-gray-600 transition duration-200 cursor-pointer">
+                  Wikidata詳細検索
+                </a>
               </h1>
               <a href="/" class="text-blue-600 hover:text-blue-800 text-sm">
                 <i class="fas fa-arrow-left mr-2"></i>

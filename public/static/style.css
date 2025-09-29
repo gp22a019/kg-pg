@@ -141,6 +141,51 @@ body {
   background-color: rgba(239, 246, 255, 0.5);
 }
 
+/* 画像表示の改善 */
+.image-container img {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.image-container img:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 画像モーダル */
+#image-modal {
+  animation: modalFadeIn 0.3s ease-out;
+  backdrop-filter: blur(2px);
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 画像エラー表示 */
+.image-error-placeholder {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  border: 2px dashed #d1d5db;
+}
+
+/* 画像の読み込み改善 */
+.image-loading {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* プロパティテーブルのスタイル改善 */
 .property-table {
   border-collapse: separate;
