@@ -1,1 +1,130 @@
-h1 { font-family: Arial, Helvetica, sans-serif; }
+/* KG Search for Wikidata - 改良版 カスタムスタイル */
+
+/* スムーススクロール */
+html {
+  scroll-behavior: smooth;
+}
+
+/* カスタムフォントの追加設定 */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+/* ローディングアニメーション */
+.fa-spinner {
+  animation: fa-spin 2s infinite linear;
+}
+
+/* カードホバーエフェクト */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* モーダルアニメーション */
+.modal-enter {
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 検索結果のフェードイン */
+.result-item {
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* プログレスバー */
+.progress-bar {
+  background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+  height: 3px;
+  transition: width 0.3s ease;
+}
+
+/* カスタムスクロールバー */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* フォーカススタイル強化 */
+.focus-visible:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* エラー状態のフィールド */
+.input-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* 成功状態のフィールド */
+.input-success {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* モバイル対応の改善 */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+}
+
+/* プリント対応 */
+@media print {
+  .no-print {
+    display: none;
+  }
+  
+  body {
+    background: white;
+  }
+  
+  .bg-gray-100 {
+    background: white !important;
+  }
+}
