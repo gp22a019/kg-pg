@@ -125,7 +125,15 @@ app.get('/api/search', async (c) => {
     }
 
     // Step 1: Wikimedia API でエンティティIDを取得
-    const entityIds = await getWikidataEntityIds(query, lang, limit, offset)
+    let entityIds = await getWikidataEntityIds(query, lang, limit, offset)
+    
+    // 結果が少ない場合は英語でも検索（オリジナルKG Searchの動作を模倣）
+    if (entityIds.length < 5 && lang !== 'en') {
+      const enEntityIds = await getWikidataEntityIds(query, 'en', limit - entityIds.length, offset)
+      // 重複を避けて追加
+      const uniqueEnIds = enEntityIds.filter(id => !entityIds.includes(id))
+      entityIds = [...entityIds, ...uniqueEnIds]
+    }
     
     if (entityIds.length === 0) {
       return c.json({
@@ -135,14 +143,12 @@ app.get('/api/search', async (c) => {
       })
     }
 
-    // Step 2: SPARQLクエリでエンティティの詳細情報を取得（元のKG Search方式）
+    // Step 2: SPARQLクエリでエンティティの詳細情報を取得（関連度順を維持）
     const sparqlQuery = `
       SELECT DISTINCT ?item ?itemLabel ?itemDescription WHERE {
         VALUES ?item { ${entityIds.map(id => `wd:${id}`).join(' ')} }
         SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
       }
-      ORDER BY ?itemLabel
-      LIMIT ${limit}
     `
 
     const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparqlQuery)}&format=json`
@@ -162,24 +168,39 @@ app.get('/api/search', async (c) => {
 
     const sparqlData = await sparqlResponse.json()
     
-    // 結果を元のKG Search形式に変換
-    const results = sparqlData.results?.bindings?.map(binding => {
+    // SPARQLレスポンスをマップに変換（高速検索用）
+    const sparqlResultsMap = new Map()
+    sparqlData.results?.bindings?.forEach(binding => {
       const item = binding.item?.value || ''
       const itemId = item.replace('http://www.wikidata.org/entity/', '')
       
-      return {
+      sparqlResultsMap.set(itemId, {
         id: itemId,
         label: binding.itemLabel?.value || itemId,
         description: binding.itemDescription?.value || '',
         concepturi: item
-      }
-    }) || []
+      })
+    })
+    
+    // 元のエンティティID順序を維持して結果を構築（関連度順を保持）
+    const results = entityIds
+      .map(id => sparqlResultsMap.get(id))
+      .filter(Boolean)
     
     return c.json({
       success: true,
       results: results,
       hasMore: entityIds.length >= limit,
-      entityIds: entityIds
+      totalFound: results.length,
+      entityIds: entityIds,
+      // デバッグ情報（開発環境でのみ表示）
+      debug: {
+        originalQuery: query,
+        language: lang,
+        entityIdsCount: entityIds.length,
+        sparqlResultsCount: sparqlData.results?.bindings?.length || 0,
+        finalResultsCount: results.length
+      }
     })
   } catch (error) {
     console.error('Search error:', error)
@@ -189,10 +210,23 @@ app.get('/api/search', async (c) => {
   }
 })
 
-// Helper function: Wikimedia APIでエンティティIDを取得
+// Helper function: Wikimedia APIでエンティティIDを取得（オリジナルKG Search準拠）
 async function getWikidataEntityIds(query: string, lang: string, limit: number, offset: number): Promise<string[]> {
   try {
-    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(query)}&language=${lang}&limit=${limit}&continue=${offset}&format=json&origin=*`
+    // オリジナルKG Searchと同じパラメータを使用
+    const params = new URLSearchParams({
+      action: 'wbsearchentities',
+      search: query,
+      language: lang,
+      limit: limit.toString(),
+      continue: offset.toString(),
+      format: 'json',
+      origin: '*',
+      type: 'item',        // アイテムのみに限定
+      strictlanguage: 'false'  // 厳密な言語マッチングを無効化（より多くの結果を取得）
+    })
+
+    const searchUrl = `https://www.wikidata.org/w/api.php?${params.toString()}`
     
     const response = await fetch(searchUrl, {
       method: 'GET',
@@ -208,7 +242,12 @@ async function getWikidataEntityIds(query: string, lang: string, limit: number, 
     }
 
     const data = await response.json()
-    return (data.search || []).map((item: any) => item.id).filter(Boolean)
+    
+    // 検索結果の関連度順序を維持
+    return (data.search || [])
+      .map((item: any) => item.id)
+      .filter(Boolean)
+      .slice(0, limit)  // 念のためlimitを再適用
   } catch (error) {
     console.error('Entity search error:', error)
     return []
