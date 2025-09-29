@@ -358,13 +358,14 @@ class KGSearch {
 
     // テーブル形式で表示
     const rows = Object.entries(groupedProps).map(([propLabel, values]) => {
-      const valuesList = values.map(value => {
+      const valuesList = values.map((value, valueIndex) => {
         // 日本語ラベル -> 英語ラベル -> 元の値の優先順
         let valueText = value.valueJaLabel?.value || value.valueLabel?.value || value.value?.value || 'Unknown'
         let valueDescription = value.valueDescription?.value || ''
         
         const isUrl = value.value?.value?.startsWith('http')
         const isImage = isUrl && (value.value.value.includes('.jpg') || value.value.value.includes('.png') || value.value.value.includes('.jpeg'))
+        const isWikidataEntity = this.isWikidataEntity(value.value?.value)
         
         if (isImage) {
           return `
@@ -373,7 +374,30 @@ class KGSearch {
                    class="max-w-32 max-h-24 object-cover rounded border">
             </div>
           `
+        } else if (isWikidataEntity) {
+          // Wikidataエンティティの場合、インライン展開可能なリンクとして表示
+          const entityId = this.extractEntityId(value.value.value)
+          const uniqueId = `inline-entity-${entityId}-${Date.now()}-${valueIndex}`
+          
+          return `
+            <div class="mb-1">
+              <button 
+                onclick="kgSearch.toggleInlineEntity('${entityId}', '${uniqueId}')"
+                class="inline-entity-btn text-blue-600 hover:text-blue-800 text-sm underline cursor-pointer focus:outline-none">
+                <i class="fas fa-search mr-1"></i>
+                ${this.escapeHtml(valueText)}
+              </button>
+              ${valueDescription ? `<span class="text-gray-500 text-xs ml-2">(${this.escapeHtml(valueDescription)})</span>` : ''}
+              <div id="${uniqueId}" class="hidden inline-entity-expand mt-2 ml-4 p-3 bg-gray-50 border-l-4 border-blue-400 rounded shadow-sm">
+                <div class="flex items-center mb-2">
+                  <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                  <span class="text-blue-600 text-xs">詳細情報を読み込み中...</span>
+                </div>
+              </div>
+            </div>
+          `
         } else if (isUrl) {
+          // 外部URLの場合は従来通り新しいタブで開く
           return `
             <div class="mb-1">
               <a href="${this.escapeHtml(value.value.value)}" target="_blank" 
@@ -420,6 +444,146 @@ class KGSearch {
     if (!propertyUri) return null
     const match = propertyUri.match(/P\d+$/)
     return match ? match[0] : null
+  }
+
+  // Wikidataエンティティかどうかを判定
+  isWikidataEntity(uri) {
+    if (!uri || typeof uri !== 'string') return false
+    return uri.startsWith('http://www.wikidata.org/entity/Q') || uri.match(/^Q\d+$/)
+  }
+
+  // エンティティIDを抽出
+  extractEntityId(uri) {
+    if (!uri) return null
+    if (uri.match(/^Q\d+$/)) return uri
+    const match = uri.match(/\/entity\/(Q\d+)/)
+    return match ? match[1] : null
+  }
+
+  // インライン展開でエンティティ詳細を表示
+  async toggleInlineEntity(entityId, containerId) {
+    const container = document.getElementById(containerId)
+    if (!container) return
+
+    if (container.classList.contains('hidden')) {
+      // 表示
+      container.classList.remove('hidden')
+      
+      // まだ詳細情報を取得していない場合は取得
+      if (!container.dataset.loaded) {
+        await this.loadInlineEntityDetails(entityId, containerId)
+      }
+    } else {
+      // 非表示
+      container.classList.add('hidden')
+    }
+  }
+
+  // インライン表示用にエンティティ詳細を取得
+  async loadInlineEntityDetails(entityId, containerId) {
+    const container = document.getElementById(containerId)
+    if (!container) return
+    
+    try {
+      const params = new URLSearchParams({
+        lang: this.currentLang
+      })
+
+      const response = await fetch(`/api/entity/${entityId}?${params}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch entity details')
+      }
+
+      this.displayInlineEntityDetails(entityId, data.properties, containerId)
+      container.dataset.loaded = 'true'
+
+    } catch (error) {
+      console.error('Inline entity details error:', error)
+      container.innerHTML = `
+        <div class="py-2 text-red-600 text-xs">
+          <i class="fas fa-exclamation-triangle mr-1"></i>
+          詳細情報の取得に失敗しました: ${error.message}
+        </div>
+      `
+    }
+  }
+
+  // インライン表示用に詳細情報をフォーマット
+  displayInlineEntityDetails(entityId, properties, containerId) {
+    const container = document.getElementById(containerId)
+    if (!container) return
+    
+    // 重要なプロパティのみを表示（スペース節約のため）
+    const importantProperties = this.filterImportantProperties(properties)
+    const formattedProperties = this.formatInlineProperties(importantProperties)
+    
+    container.innerHTML = `
+      <div class="text-xs">
+        <div class="font-medium text-gray-700 mb-2">
+          <i class="fas fa-info-circle mr-1"></i>
+          ${entityId} の詳細情報
+        </div>
+        ${formattedProperties}
+        <div class="mt-2 pt-2 border-t border-gray-200">
+          <a href="https://www.wikidata.org/wiki/${entityId}" target="_blank" 
+             class="text-blue-500 hover:text-blue-700 text-xs">
+            <i class="fas fa-external-link-alt mr-1"></i>
+            Wikidataで詳細を見る
+          </a>
+        </div>
+      </div>
+    `
+  }
+
+  // 重要なプロパティをフィルタリング（インライン表示用）
+  filterImportantProperties(properties) {
+    if (!properties || properties.length === 0) return []
+    
+    // 表示優先度の高いプロパティID
+    const importantPropIds = ['P31', 'P279', 'P17', 'P131', 'P19', 'P20', 'P27', 'P106', 'P569', 'P570']
+    
+    const importantProps = properties.filter(prop => {
+      const propId = this.extractPropertyId(prop.prop?.value)
+      return propId && importantPropIds.includes(propId)
+    })
+    
+    // 最大5件まで表示
+    return importantProps.slice(0, 5)
+  }
+
+  // インライン表示用の簡潔なフォーマット
+  formatInlineProperties(properties) {
+    if (!properties || properties.length === 0) {
+      return '<div class="text-xs text-gray-500">基本情報がありません</div>'
+    }
+
+    const rows = properties.map(prop => {
+      // プロパティラベルを取得
+      let propLabel = prop.propJaLabel?.value || prop.propLabel?.value
+      if (!propLabel || propLabel.startsWith('http')) {
+        const propId = this.extractPropertyId(prop.prop?.value)
+        propLabel = propId ? this.getPropertyLabel(propId) : 'その他'
+      }
+
+      // 値を取得（日本語優先）
+      let valueText = prop.valueJaLabel?.value || prop.valueLabel?.value || prop.value?.value || 'Unknown'
+      
+      // URLの場合は短縮表示
+      if (valueText.startsWith('http')) {
+        valueText = valueText.length > 30 ? valueText.substring(0, 27) + '...' : valueText
+      }
+
+      return `
+        <div class="flex justify-between items-start py-1 text-xs">
+          <span class="text-gray-600 font-medium min-w-0 w-16 mr-2">${this.escapeHtml(propLabel)}</span>
+          <span class="text-gray-800 flex-1">${this.escapeHtml(valueText)}</span>
+        </div>
+      `
+    }).join('')
+
+    return `<div class="space-y-1">${rows}</div>`
   }
 
   clearResults() {
