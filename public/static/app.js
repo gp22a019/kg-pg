@@ -405,7 +405,26 @@ class KGSearch {
       'P271': 'CiNii研究者ID',
       'P3417': 'Quora ID',
       'P159': '本部所在地',
-      'P126': '維持機関'
+      'P126': '維持機関',
+      'P112': '創設者',
+      'P127': '所有者',
+      'P138': '命名者',
+      'P169': '最高経営責任者',
+      'P355': '子会社',
+      'P749': '親会社',
+      'P1448': '正式名称',
+      'P2078': '取締役会議長',
+      'P3320': '役員',
+      'P1365': '代替名',
+      'P740': '設立地',
+      'P452': '産業',
+      'P161': '出演者',
+      'P57': '監督',
+      'P58': '脚本家',
+      'P86': '作曲者',
+      'P175': '演奏者',
+      'P264': 'レーベル',
+      'P136': 'ジャンル'
     }
     
     // URIからプロパティIDを抽出
@@ -702,7 +721,7 @@ class KGSearch {
     `
   }
 
-  formatEntityPropertiesInline(properties) {
+  formatEntityPropertiesInline(properties, nestLevel = 0) {
     if (!properties || properties.length === 0) {
       return '<div class="text-sm text-gray-500">詳細情報がありません</div>'
     }
@@ -766,25 +785,46 @@ class KGSearch {
           const entityId = this.extractEntityId(value.value.value)
           const uniqueId = `inline-entity-${entityId}-${Date.now()}-${valueIndex}`
           
-          return `
-            <div class="mb-1">
-              <button 
-                onclick="kgSearch.toggleInlineEntity('${entityId}', '${uniqueId}')"
-                class="inline-entity-btn text-blue-600 hover:text-blue-800 text-sm underline cursor-pointer focus:outline-none">
-                <i class="fas fa-search mr-1"></i>
-                ${this.escapeHtml(valueText)}
-              </button>
-              ${valueDescription ? `<span class="text-gray-500 text-xs ml-2">(${this.escapeHtml(valueDescription)})</span>` : ''}
-              <div id="${uniqueId}" class="hidden inline-entity-expand mt-2">
-                <div class="inline-entity-full-display border-t border-blue-200 bg-blue-25 p-4 rounded-b-lg">
-                  <div class="flex items-center mb-2">
-                    <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
-                    <span class="text-blue-600 text-sm">詳細情報を読み込み中...</span>
+          // 入れ子制限チェック
+          const maxNestLevel = window.innerWidth < 480 ? 2 : window.innerWidth < 768 ? 3 : 4
+          const showInlineButton = nestLevel < maxNestLevel
+          
+          if (showInlineButton) {
+            return `
+              <div class="mb-1">
+                <button 
+                  onclick="kgSearch.toggleInlineEntity('${entityId}', '${uniqueId}')"
+                  class="inline-entity-btn text-blue-600 hover:text-blue-800 text-sm underline cursor-pointer focus:outline-none">
+                  <i class="fas fa-search mr-1"></i>
+                  ${this.escapeHtml(valueText)}
+                </button>
+                ${valueDescription ? `<span class="text-gray-500 text-xs ml-2">(${this.escapeHtml(valueDescription)})</span>` : ''}
+                <div id="${uniqueId}" class="hidden inline-entity-expand mt-2">
+                  <div class="inline-entity-full-display border-t border-blue-200 bg-blue-25 p-4 rounded-b-lg">
+                    <div class="flex items-center mb-2">
+                      <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                      <span class="text-blue-600 text-sm">詳細情報を読み込み中...</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          `
+            `
+          } else {
+            // 入れ子が深すぎる場合は外部リンクのみ
+            return `
+              <div class="mb-1">
+                <span class="text-sm text-gray-700">
+                  ${this.escapeHtml(valueText)}
+                  ${valueDescription ? `<span class="text-gray-500 text-xs ml-2">(${this.escapeHtml(valueDescription)})</span>` : ''}
+                </span>
+                <a href="https://www.wikidata.org/wiki/${entityId}" target="_blank" 
+                   class="text-blue-600 hover:text-blue-800 text-xs ml-2 px-1 py-0.5 bg-blue-100 rounded">
+                  <i class="fas fa-external-link-alt mr-1"></i>
+                  詳細
+                </a>
+              </div>
+            `
+          }
         } else if (isUrl) {
           // 外部URLの場合は従来通り新しいタブで開く
           return `
@@ -929,20 +969,60 @@ class KGSearch {
     }
   }
 
-  // インライン表示用に詳細情報をフォーマット（フル表示版）
+  // インライン表示用に詳細情報をフォーマット（フル表示版・レスポンシブ改善版）
   displayInlineEntityDetails(entityId, properties, containerId) {
     const container = document.getElementById(containerId)
     if (!container) return
     
+    // 入れ子の深さを計算
+    const nestLevel = this.calculateNestLevel(container)
+    const maxNestLevel = window.innerWidth < 480 ? 2 : window.innerWidth < 768 ? 3 : 4
+    
+    // 深すぎる場合は制限メッセージを表示
+    if (nestLevel > maxNestLevel) {
+      container.innerHTML = `
+        <div class="border-t border-blue-200 bg-blue-25 p-3 rounded-b-lg">
+          <div class="flex items-center justify-between text-sm">
+            <div class="text-blue-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              ${entityId} の詳細情報
+            </div>
+            <div class="flex space-x-2">
+              <a href="https://www.wikidata.org/wiki/${entityId}" target="_blank" 
+                 class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 bg-blue-100 rounded">
+                <i class="fas fa-external-link-alt mr-1"></i>
+                Wikidata
+              </a>
+              <button 
+                onclick="kgSearch.toggleInlineEntity('${entityId}', '${containerId}')"
+                class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 bg-blue-100 rounded">
+                <i class="fas fa-times mr-1"></i>
+                閉じる
+              </button>
+            </div>
+          </div>
+          <div class="mt-2 text-xs text-blue-600">
+            <i class="fas fa-exclamation-triangle mr-1"></i>
+            入れ子が深すぎます。詳細はWikidataリンクをご確認ください。
+          </div>
+        </div>
+      `
+      return
+    }
+    
     // 1段階目と同じフル表示を使用（画像やその他情報も含む）
-    const formattedProperties = this.formatEntityPropertiesInline(properties)
+    const formattedProperties = this.formatEntityPropertiesInline(properties, nestLevel)
+    
+    // 入れ子レベルに応じたクラス調整
+    const nestClass = nestLevel > 1 ? 'nested-level-' + nestLevel : ''
+    const widthClass = this.getResponsiveWidthClass(nestLevel)
     
     container.innerHTML = `
-      <div class="inline-entity-full-display border-t border-blue-200 bg-blue-25 p-4 rounded-b-lg">
+      <div class="inline-entity-full-display border-t border-blue-200 bg-blue-25 p-4 rounded-b-lg ${nestClass} ${widthClass}">
         <div class="flex items-center justify-between mb-3">
           <div class="font-medium text-blue-800 text-sm">
             <i class="fas fa-info-circle mr-2"></i>
-            ${entityId} の詳細情報
+            ${entityId} の詳細情報 ${nestLevel > 1 ? '(レベル' + nestLevel + ')' : ''}
           </div>
           <div class="flex space-x-2">
             <a href="https://www.wikidata.org/wiki/${entityId}" target="_blank" 
@@ -958,11 +1038,39 @@ class KGSearch {
             </button>
           </div>
         </div>
-        <div class="inline-entity-content">
+        <div class="inline-entity-content custom-scrollbar">
           ${formattedProperties}
         </div>
       </div>
     `
+  }
+
+  // 入れ子の深さを計算
+  calculateNestLevel(container) {
+    let level = 0
+    let parent = container.parentElement
+    
+    while (parent) {
+      if (parent.classList && parent.classList.contains('inline-entity-full-display')) {
+        level++
+      }
+      parent = parent.parentElement
+    }
+    
+    return level
+  }
+
+  // レスポンシブ幅クラスを取得
+  getResponsiveWidthClass(nestLevel) {
+    const screenWidth = window.innerWidth
+    
+    if (screenWidth < 480) {
+      return nestLevel > 1 ? 'max-w-full' : 'max-w-full'
+    } else if (screenWidth < 768) {
+      return nestLevel > 2 ? 'max-w-xs' : nestLevel > 1 ? 'max-w-sm' : 'max-w-full'
+    } else {
+      return nestLevel > 3 ? 'max-w-xs' : nestLevel > 2 ? 'max-w-sm' : nestLevel > 1 ? 'max-w-md' : 'max-w-full'
+    }
   }
 
 

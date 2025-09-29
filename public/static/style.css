@@ -103,12 +103,29 @@ body {
   transform: translateY(-1px);
 }
 
-/* インライン展開のフル表示スタイル */
+/* インライン展開のフル表示スタイル（レスポンシブ改善版） */
 .inline-entity-full-display {
   max-height: 500px;
   overflow-y: auto;
+  overflow-x: auto;
   background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
   border-left: 4px solid #3b82f6;
+  max-width: calc(100vw - 60px); /* 画面幅の制限 */
+  word-wrap: break-word;
+  /* 入れ子の深さに応じた幅制限 */
+}
+
+/* 入れ子レベルごとの幅制限 */
+.inline-entity-full-display .inline-entity-full-display {
+  max-width: calc(100% - 20px); /* 2段目 */
+  margin-left: 10px;
+  border-left: 3px solid #60a5fa;
+}
+
+.inline-entity-full-display .inline-entity-full-display .inline-entity-full-display {
+  max-width: calc(100% - 20px); /* 3段目 */
+  margin-left: 10px;
+  border-left: 2px solid #93c5fd;
 }
 
 .inline-entity-content {
@@ -338,6 +355,56 @@ body {
   }
 }
 
+/* インライン展開のレスポンシブ対応 */
+@media (max-width: 768px) {
+  .inline-entity-full-display {
+    max-width: calc(100vw - 20px);
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .inline-entity-full-display .inline-entity-full-display {
+    max-width: calc(100% - 10px);
+    margin-left: 5px;
+  }
+  
+  .inline-entity-content .property-table {
+    font-size: 12px;
+  }
+  
+  .inline-entity-content .property-table td {
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .inline-entity-full-display {
+    max-width: calc(100vw - 10px);
+  }
+  
+  /* 3段目以降は折りたたみボタンのみ表示 */
+  .inline-entity-full-display .inline-entity-full-display .inline-entity-full-display {
+    display: none;
+  }
+  
+  .inline-entity-content .property-table td {
+    padding: 4px 6px;
+  }
+}
+
+/* 水平スクロール対応 */
+.inline-entity-horizontal-scroll {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.inline-entity-horizontal-scroll .inline-entity-full-display {
+  display: inline-block;
+  white-space: normal;
+  vertical-align: top;
+  min-width: 300px;
+}
+
 /* プリント対応 */
 @media print {
   .no-print {
@@ -350,5 +417,10 @@ body {
   
   .bg-gray-100 {
     background: white !important;
+  }
+  
+  .inline-entity-full-display {
+    max-width: 100%;
+    overflow: visible;
   }
 }

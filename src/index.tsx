@@ -538,11 +538,18 @@ app.get('/api/entity/:id', async (c) => {
       return c.json({ error: '無効なエンティティIDです' }, 400)
     }
 
-    // 元のKG Searchと同じ形式のSPARQLクエリ
+    // プロパティラベルも含めたSPARQLクエリ（改善版）
     const sparqlQuery = `
-      SELECT DISTINCT ?prop ?propLabel ?value ?valueLabel WHERE {
+      SELECT DISTINCT ?prop ?propLabel ?propJaLabel ?value ?valueLabel WHERE {
         wd:${entityId} ?prop ?value .
         ?property wikibase:directClaim ?prop .
+        
+        # プロパティの日本語ラベルを明示的に取得
+        OPTIONAL {
+          ?property rdfs:label ?propJaLabel .
+          FILTER(LANG(?propJaLabel) = "${lang}")
+        }
+        
         SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang},en". }
         FILTER(!isBlank(?value))
       }
