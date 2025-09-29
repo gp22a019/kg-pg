@@ -103,6 +103,32 @@ body {
   transform: translateY(-1px);
 }
 
+/* プロパティテーブルのスタイル改善 */
+.property-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.property-label-cell {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-right: 2px solid #cbd5e1;
+}
+
+.property-value-cell {
+  background: #ffffff;
+}
+
+/* ホバー効果の改善 */
+.hover\:bg-gray-25:hover {
+  background-color: rgba(249, 250, 251, 0.5);
+}
+
+/* プロパティラベルのバッジスタイル */
+.property-badge {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 1px solid #93c5fd;
+}
+
 /* 検索入力フィールドのフォーカス効果 */
 .search-input-focused {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);

@@ -67,7 +67,22 @@ class KGSearch {
       'P571': '設立年',
       'P576': '解散年',
       'P1416': '所属',
-      'P108': '雇用者'
+      'P108': '雇用者',
+      'P213': 'ISNI',
+      'P214': 'VIAF ID',
+      'P244': 'LCAuth ID',
+      'P227': 'GND ID',
+      'P245': 'ULAN ID',
+      'P11127': 'Freebase ID',
+      'P11496': 'Semantic Scholar ID',
+      'P13092': 'KAKEN研究者番号',
+      'P2002': 'Twitter ID',
+      'P2013': 'Facebook ID',
+      'P2427': 'GRID ID',
+      'P271': 'CiNii研究者ID',
+      'P3417': 'Quora ID',
+      'P159': '本部所在地',
+      'P126': '維持機関'
     }
     
     // URIからプロパティIDを抽出
@@ -78,6 +93,32 @@ class KGSearch {
     }
     
     return propertyId
+  }
+
+  // プロパティの表示ラベルを取得（日本語ラベル + ID形式）
+  getPropertyDisplayLabel(prop) {
+    // SPARQLレスポンスから日本語ラベルを取得
+    let jaLabel = prop.propJaLabel?.value || prop.propLabel?.value
+    
+    // プロパティIDを抽出
+    const propId = this.extractPropertyId(prop.prop?.value)
+    
+    if (!propId) {
+      return 'その他'
+    }
+
+    // 日本語ラベルがない、またはURLの場合は辞書から取得
+    if (!jaLabel || jaLabel.startsWith('http')) {
+      jaLabel = this.getPropertyLabel(propId)
+    }
+
+    // 日本語ラベルがプロパティIDと同じ場合はIDのみ表示
+    if (jaLabel === propId) {
+      return propId
+    }
+
+    // 「日本語ラベル (PID)」形式で返す
+    return `${jaLabel} (${propId})`
   }
 
   async performSearch(offset = 0) {
@@ -338,17 +379,11 @@ class KGSearch {
       return '<div class="text-sm text-gray-500">詳細情報がありません</div>'
     }
 
-    // プロパティをグループ化（日本語ラベル優先）
+    // プロパティをグループ化（改良版ラベル使用）
     const groupedProps = {}
     properties.forEach(prop => {
-      // 日本語ラベル -> 英語ラベル -> プロパティIDの優先順
-      let propLabel = prop.propJaLabel?.value || prop.propLabel?.value
-      
-      // プロパティIDから日本語名を取得
-      if (!propLabel || propLabel.startsWith('http')) {
-        const propId = this.extractPropertyId(prop.prop?.value)
-        propLabel = propId ? this.getPropertyLabel(propId) : 'その他'
-      }
+      // 改良されたプロパティ表示ラベルを使用
+      const propLabel = this.getPropertyDisplayLabel(prop)
       
       if (!groupedProps[propLabel]) {
         groupedProps[propLabel] = []
@@ -418,11 +453,14 @@ class KGSearch {
       }).join('')
       
       return `
-        <tr class="border-b border-gray-100">
-          <td class="py-2 pr-4 text-sm font-medium text-gray-700 align-top min-w-0 w-24">
-            ${this.escapeHtml(propLabel)}
+        <tr class="border-b border-gray-100 hover:bg-gray-25 transition duration-150">
+          <td class="py-3 pr-4 text-sm font-medium text-gray-800 align-top bg-gray-50 border-r border-gray-200" style="min-width: 120px; max-width: 160px;">
+            <div class="flex items-center">
+              <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-2">📋</span>
+              ${this.escapeHtml(propLabel)}
+            </div>
           </td>
-          <td class="py-2 text-sm text-gray-600">
+          <td class="py-3 pl-4 text-sm text-gray-700">
             ${valuesList}
           </td>
         </tr>
@@ -430,8 +468,8 @@ class KGSearch {
     }).join('')
 
     return `
-      <div class="overflow-hidden">
-        <table class="w-full text-left">
+      <div class="overflow-hidden border border-gray-200 rounded-lg shadow-sm">
+        <table class="property-table w-full text-left">
           <tbody>
             ${rows}
           </tbody>
@@ -556,34 +594,32 @@ class KGSearch {
   // インライン表示用の簡潔なフォーマット
   formatInlineProperties(properties) {
     if (!properties || properties.length === 0) {
-      return '<div class="text-xs text-gray-500">基本情報がありません</div>'
+      return '<div class="text-xs text-gray-500 italic">基本情報がありません</div>'
     }
 
     const rows = properties.map(prop => {
-      // プロパティラベルを取得
-      let propLabel = prop.propJaLabel?.value || prop.propLabel?.value
-      if (!propLabel || propLabel.startsWith('http')) {
-        const propId = this.extractPropertyId(prop.prop?.value)
-        propLabel = propId ? this.getPropertyLabel(propId) : 'その他'
-      }
+      // 改良されたプロパティ表示ラベルを使用
+      const propLabel = this.getPropertyDisplayLabel(prop)
 
       // 値を取得（日本語優先）
       let valueText = prop.valueJaLabel?.value || prop.valueLabel?.value || prop.value?.value || 'Unknown'
       
       // URLの場合は短縮表示
       if (valueText.startsWith('http')) {
-        valueText = valueText.length > 30 ? valueText.substring(0, 27) + '...' : valueText
+        valueText = valueText.length > 25 ? valueText.substring(0, 22) + '...' : valueText
       }
 
       return `
-        <div class="flex justify-between items-start py-1 text-xs">
-          <span class="text-gray-600 font-medium min-w-0 w-16 mr-2">${this.escapeHtml(propLabel)}</span>
-          <span class="text-gray-800 flex-1">${this.escapeHtml(valueText)}</span>
+        <div class="flex items-start py-1.5 text-xs border-b border-gray-100 last:border-b-0">
+          <span class="text-gray-600 font-medium bg-gray-100 px-2 py-1 rounded text-xs mr-3 flex-shrink-0" style="min-width: 80px; max-width: 100px;">
+            ${this.escapeHtml(propLabel)}
+          </span>
+          <span class="text-gray-800 flex-1 pt-1">${this.escapeHtml(valueText)}</span>
         </div>
       `
     }).join('')
 
-    return `<div class="space-y-1">${rows}</div>`
+    return `<div class="space-y-0 bg-white border border-gray-200 rounded">${rows}</div>`
   }
 
   clearResults() {
