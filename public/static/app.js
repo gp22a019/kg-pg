@@ -10,6 +10,8 @@ class KGSearch {
     this.currentQuery = ''
     this.currentLang = 'ja'
     this.expandedItems = new Set()
+    this.searchHistory = this.loadSearchHistory()
+    this.advancedSearchHistory = this.loadAdvancedSearchHistory()
     this.init()
   }
 
@@ -50,6 +52,15 @@ class KGSearch {
         // 将来的にリアルタイム候補表示を追加可能
       })
     }
+
+    // 検索履歴のクリアボタン
+    const clearHistoryBtn = document.getElementById('clear-history-btn')
+    if (clearHistoryBtn) {
+      clearHistoryBtn.addEventListener('click', () => this.clearSearchHistory())
+    }
+
+    // 初期化時に検索履歴を表示
+    this.displaySearchHistory()
   }
 
   setupAdvancedEventListeners() {
@@ -82,6 +93,15 @@ class KGSearch {
         }
       })
     }
+
+    // 詳細検索履歴のクリアボタン
+    const clearAdvancedHistoryBtn = document.getElementById('clear-advanced-history-btn')
+    if (clearAdvancedHistoryBtn) {
+      clearAdvancedHistoryBtn.addEventListener('click', () => this.clearAdvancedSearchHistory())
+    }
+
+    // 詳細検索ページの履歴表示
+    this.displayAdvancedSearchHistory()
   }
 
   async performAdvancedSearch() {
@@ -121,6 +141,16 @@ class KGSearch {
         limit: resultLimit?.value || '20',
         show_query: 'true'
       })
+
+      // 詳細検索履歴に追加（検索実行時のみ）
+      if (query) {
+        this.addToAdvancedSearchHistory(
+          query, 
+          searchType?.value || 'fuzzy', 
+          searchLang?.value || 'ja',
+          entityType?.value || ''
+        )
+      }
 
       const response = await fetch(`/api/advanced-search?${params}`)
       const data = await response.json()
@@ -440,6 +470,11 @@ class KGSearch {
       this.currentQuery = query
       this.currentLang = searchLang?.value || 'ja'
       this.currentOffset = offset
+
+      // 新しい検索の場合は履歴に追加
+      if (offset === 0) {
+        this.addToSearchHistory(query, this.currentLang)
+      }
 
       // API呼び出し
       const params = new URLSearchParams({
@@ -1035,6 +1070,280 @@ class KGSearch {
       }
     }
     document.addEventListener('keydown', handleEscape)
+  }
+
+  // 検索履歴機能
+  loadSearchHistory() {
+    try {
+      const history = localStorage.getItem('kgSearch.history')
+      return history ? JSON.parse(history) : []
+    } catch (e) {
+      console.warn('検索履歴の読み込みに失敗しました:', e)
+      return []
+    }
+  }
+
+  saveSearchHistory() {
+    try {
+      localStorage.setItem('kgSearch.history', JSON.stringify(this.searchHistory))
+    } catch (e) {
+      console.warn('検索履歴の保存に失敗しました:', e)
+    }
+  }
+
+  addToSearchHistory(query, lang = 'ja') {
+    if (!query || !query.trim()) return
+    
+    const searchItem = {
+      query: query.trim(),
+      lang: lang,
+      timestamp: new Date().getTime()
+    }
+
+    // 重複を削除
+    this.searchHistory = this.searchHistory.filter(item => 
+      !(item.query === searchItem.query && item.lang === searchItem.lang)
+    )
+
+    // 新しい検索を先頭に追加
+    this.searchHistory.unshift(searchItem)
+
+    // 最大20件に制限
+    if (this.searchHistory.length > 20) {
+      this.searchHistory = this.searchHistory.slice(0, 20)
+    }
+
+    this.saveSearchHistory()
+    this.displaySearchHistory()
+  }
+
+  displaySearchHistory() {
+    const historySection = document.getElementById('search-history-section')
+    const historyList = document.getElementById('search-history-list')
+    
+    if (!historySection || !historyList) return
+
+    if (this.searchHistory.length === 0) {
+      historySection.classList.add('hidden')
+      return
+    }
+
+    historySection.classList.remove('hidden')
+    
+    // 履歴アイテムを生成
+    historyList.innerHTML = this.searchHistory
+      .slice(0, 5) // 最新5件のみ表示
+      .map((item, index) => {
+        const timeAgo = this.getTimeAgo(item.timestamp)
+        const langLabel = item.lang === 'ja' ? '日本語' : 'English'
+        
+        return `
+          <div class="history-item flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 cursor-pointer transition duration-200"
+               onclick="kgSearch.selectFromHistory('${this.escapeHtml(item.query)}', '${item.lang}')">
+            <div class="flex items-center flex-grow">
+              <i class="fas fa-history text-gray-400 mr-2 text-sm"></i>
+              <span class="text-sm text-gray-700 flex-grow">${this.escapeHtml(item.query)}</span>
+              <span class="text-xs text-gray-400 ml-2">${langLabel}</span>
+            </div>
+            <div class="flex items-center ml-2">
+              <span class="text-xs text-gray-400 mr-2">${timeAgo}</span>
+              <button onclick="event.stopPropagation(); kgSearch.removeFromHistory(${index})" 
+                      class="text-gray-300 hover:text-red-500 text-xs" 
+                      title="削除">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        `
+      }).join('')
+  }
+
+  selectFromHistory(query, lang) {
+    const searchInput = document.getElementById('search-input')
+    const searchLang = document.getElementById('search-lang')
+    
+    if (searchInput) searchInput.value = query
+    if (searchLang) searchLang.value = lang
+
+    // 検索を実行
+    this.performSearch()
+  }
+
+  removeFromHistory(index) {
+    this.searchHistory.splice(index, 1)
+    this.saveSearchHistory()
+    this.displaySearchHistory()
+  }
+
+  clearSearchHistory() {
+    if (confirm('検索履歴をすべて削除しますか？')) {
+      this.searchHistory = []
+      this.saveSearchHistory()
+      this.displaySearchHistory()
+    }
+  }
+
+  getTimeAgo(timestamp) {
+    const now = new Date().getTime()
+    const diff = now - timestamp
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+
+    if (minutes < 1) return '今'
+    if (minutes < 60) return `${minutes}分前`
+    if (hours < 24) return `${hours}時間前`
+    if (days < 7) return `${days}日前`
+    return new Date(timestamp).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })
+  }
+
+  // 詳細検索履歴機能
+  loadAdvancedSearchHistory() {
+    try {
+      const history = localStorage.getItem('kgSearch.advancedHistory')
+      return history ? JSON.parse(history) : []
+    } catch (e) {
+      console.warn('詳細検索履歴の読み込みに失敗しました:', e)
+      return []
+    }
+  }
+
+  saveAdvancedSearchHistory() {
+    try {
+      const advancedHistory = this.advancedSearchHistory || []
+      localStorage.setItem('kgSearch.advancedHistory', JSON.stringify(advancedHistory))
+    } catch (e) {
+      console.warn('詳細検索履歴の保存に失敗しました:', e)
+    }
+  }
+
+  addToAdvancedSearchHistory(query, searchType, lang, entityType) {
+    if (!query || !query.trim()) return
+    
+    if (!this.advancedSearchHistory) {
+      this.advancedSearchHistory = this.loadAdvancedSearchHistory()
+    }
+
+    const searchItem = {
+      query: query.trim(),
+      searchType: searchType || 'fuzzy',
+      lang: lang || 'ja',
+      entityType: entityType || '',
+      timestamp: new Date().getTime()
+    }
+
+    // 重複を削除
+    this.advancedSearchHistory = this.advancedSearchHistory.filter(item => 
+      !(item.query === searchItem.query && 
+        item.searchType === searchItem.searchType && 
+        item.lang === searchItem.lang &&
+        item.entityType === searchItem.entityType)
+    )
+
+    // 新しい検索を先頭に追加
+    this.advancedSearchHistory.unshift(searchItem)
+
+    // 最大15件に制限
+    if (this.advancedSearchHistory.length > 15) {
+      this.advancedSearchHistory = this.advancedSearchHistory.slice(0, 15)
+    }
+
+    this.saveAdvancedSearchHistory()
+    this.displayAdvancedSearchHistory()
+  }
+
+  displayAdvancedSearchHistory() {
+    const historySection = document.getElementById('advanced-search-history-section')
+    const historyList = document.getElementById('advanced-search-history-list')
+    
+    if (!historySection || !historyList) return
+
+    if (!this.advancedSearchHistory) {
+      this.advancedSearchHistory = this.loadAdvancedSearchHistory()
+    }
+
+    if (this.advancedSearchHistory.length === 0) {
+      historySection.classList.add('hidden')
+      return
+    }
+
+    historySection.classList.remove('hidden')
+    
+    // 履歴アイテムを生成
+    historyList.innerHTML = this.advancedSearchHistory
+      .slice(0, 4) // 最新4件のみ表示
+      .map((item, index) => {
+        const timeAgo = this.getTimeAgo(item.timestamp)
+        const langLabel = item.lang === 'ja' ? '日本語' : 
+                         item.lang === 'en' ? 'English' :
+                         item.lang === 'zh' ? '中文' : 
+                         item.lang === 'ko' ? '한국어' : item.lang
+        const searchTypeLabel = item.searchType === 'fuzzy' ? 'あいまい' :
+                               item.searchType === 'prefix' ? '前方一致' :
+                               item.searchType === 'exact' ? '完全一致' :
+                               item.searchType === 'contains' ? '部分一致' : item.searchType
+        
+        return `
+          <div class="history-item flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100 cursor-pointer transition duration-200"
+               onclick="kgSearch.selectFromAdvancedHistory(${index})">
+            <div class="flex items-center flex-grow">
+              <i class="fas fa-history text-gray-400 mr-2 text-sm"></i>
+              <span class="text-sm text-gray-700 flex-grow">${this.escapeHtml(item.query)}</span>
+              <div class="flex items-center ml-2 space-x-1">
+                <span class="text-xs bg-blue-100 text-blue-600 px-1 py-0.5 rounded">${searchTypeLabel}</span>
+                <span class="text-xs text-gray-400">${langLabel}</span>
+                ${item.entityType ? `<span class="text-xs bg-green-100 text-green-600 px-1 py-0.5 rounded">${item.entityType}</span>` : ''}
+              </div>
+            </div>
+            <div class="flex items-center ml-2">
+              <span class="text-xs text-gray-400 mr-2">${timeAgo}</span>
+              <button onclick="event.stopPropagation(); kgSearch.removeFromAdvancedHistory(${index})" 
+                      class="text-gray-300 hover:text-red-500 text-xs" 
+                      title="削除">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        `
+      }).join('')
+  }
+
+  selectFromAdvancedHistory(index) {
+    if (!this.advancedSearchHistory || !this.advancedSearchHistory[index]) return
+
+    const item = this.advancedSearchHistory[index]
+    
+    // フォーム要素に値を設定
+    const elements = {
+      'advanced-search-input': item.query,
+      'search-type': item.searchType,
+      'advanced-search-lang': item.lang,
+      'entity-type': item.entityType
+    }
+
+    Object.entries(elements).forEach(([id, value]) => {
+      const element = document.getElementById(id)
+      if (element && value) element.value = value
+    })
+
+    // 検索を実行
+    this.performAdvancedSearch()
+  }
+
+  removeFromAdvancedHistory(index) {
+    if (!this.advancedSearchHistory) return
+    
+    this.advancedSearchHistory.splice(index, 1)
+    this.saveAdvancedSearchHistory()
+    this.displayAdvancedSearchHistory()
+  }
+
+  clearAdvancedSearchHistory() {
+    if (confirm('詳細検索履歴をすべて削除しますか？')) {
+      this.advancedSearchHistory = []
+      this.saveAdvancedSearchHistory()
+      this.displayAdvancedSearchHistory()
+    }
   }
 
   escapeHtml(text) {

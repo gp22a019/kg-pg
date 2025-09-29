@@ -69,8 +69,29 @@ app.get('/', (c) => {
               </button>
             </div>
 
+            {/* 検索履歴セクション */}
+            <div id="search-history-section" class="mt-4 hidden">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-600">
+                  <i class="fas fa-history mr-1"></i>
+                  最近の検索
+                </span>
+                <button
+                  id="clear-history-btn"
+                  class="text-xs text-gray-400 hover:text-red-600 transition duration-200"
+                  title="履歴をクリア"
+                >
+                  <i class="fas fa-trash mr-1"></i>
+                  クリア
+                </button>
+              </div>
+              <div id="search-history-list" class="space-y-1">
+                {/* 履歴アイテムがここに動的に挿入されます */}
+              </div>
+            </div>
+
             {/* 詳細検索リンク */}
-            <div class="text-center mt-4">
+            <div class="text-center mt-6">
               <a 
                 href="/advanced"
                 class="text-blue-600 hover:text-blue-800 text-sm transition duration-200"
@@ -285,6 +306,27 @@ app.get('/advanced', (c) => {
                     <i class="fas fa-times mr-2"></i>
                     クリア
                   </button>
+                </div>
+              </div>
+
+              {/* 詳細検索履歴セクション */}
+              <div id="advanced-search-history-section" class="hidden mt-4 pt-4 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm text-gray-600">
+                    <i class="fas fa-history mr-1"></i>
+                    詳細検索履歴
+                  </span>
+                  <button
+                    id="clear-advanced-history-btn"
+                    class="text-xs text-gray-400 hover:text-red-600 transition duration-200"
+                    title="履歴をクリア"
+                  >
+                    <i class="fas fa-trash mr-1"></i>
+                    クリア
+                  </button>
+                </div>
+                <div id="advanced-search-history-list" class="space-y-1">
+                  {/* 履歴アイテムがここに動的に挿入されます */}
                 </div>
               </div>
             </div>
