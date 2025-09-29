@@ -14,157 +14,103 @@ app.use('/static/*', serveStatic({ root: './public' }))
 // レンダリング設定
 app.use(renderer)
 
-// メインページ
+// メインページ（Googleライクな検索画面）
 app.get('/', (c) => {
   return c.render(
-    <div>
-      <div class="bg-gray-100 min-h-screen">
-        <div class="container mx-auto px-4 py-8">
-          <div class="max-w-6xl mx-auto">
-            <header class="text-center mb-8">
-              <h1 class="text-4xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-search mr-3"></i>
-                KG Search for Wikidata - 改良版
-              </h1>
-              <p class="text-gray-600 text-lg">
-                Wikidataを使った知識グラフ検索システム（モダン実装版）
-              </p>
-            </header>
-
-            <div class="grid md:grid-cols-2 gap-6 mb-8">
-              <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4 text-blue-600">
-                  <i class="fas fa-rocket mr-2"></i>
-                  主な改良点
-                </h2>
-                <ul class="space-y-2 text-gray-700">
-                  <li><i class="fas fa-check text-green-500 mr-2"></i>Hono + TypeScript によるモダンな実装</li>
-                  <li><i class="fas fa-check text-green-500 mr-2"></i>Cloudflare Pages対応（エッジデプロイ）</li>
-                  <li><i class="fas fa-check text-green-500 mr-2"></i>TailwindCSSによるレスポンシブUI</li>
-                  <li><i class="fas fa-check text-green-500 mr-2"></i>セキュリティ強化（XSS対策等）</li>
-                  <li><i class="fas fa-check text-green-500 mr-2"></i>パフォーマンス最適化</li>
-                </ul>
-              </div>
-
-              <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold mb-4 text-green-600">
-                  <i class="fas fa-cogs mr-2"></i>
-                  技術スタック
-                </h2>
-                <ul class="space-y-2 text-gray-700">
-                  <li><strong>バックエンド:</strong> Hono Framework</li>
-                  <li><strong>フロントエンド:</strong> Vanilla JS + TailwindCSS</li>
-                  <li><strong>デプロイ:</strong> Cloudflare Pages</li>
-                  <li><strong>データソース:</strong> Wikidata SPARQL</li>
-                  <li><strong>API:</strong> Wikimedia API + SPARQL</li>
-                </ul>
-              </div>
-            </div>
-
-            <div class="text-center">
-              <a href="/search" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300 text-lg">
-                <i class="fas fa-search mr-2"></i>
-                検索を開始する
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-})
-
-// 検索ページ
-app.get('/search', (c) => {
-  return c.render(
     <div id="search-app">
-      <div class="bg-gray-100 min-h-screen">
-        <div class="container mx-auto px-4 py-8">
-          <div class="max-w-6xl mx-auto">
-            <header class="text-center mb-8">
-              <h1 class="text-3xl font-bold text-gray-800 mb-4">
-                <a href="/" class="text-blue-600 hover:text-blue-700">
-                  <i class="fas fa-search mr-2"></i>
-                  KG Search for Wikidata
-                </a>
-              </h1>
-            </header>
+      <div class="bg-gray-50 min-h-screen">
+        <div class="container mx-auto px-4">
+          {/* ヘッダー */}
+          <header class="pt-8 pb-6 text-center">
+            <h1 class="text-3xl font-normal text-gray-800 mb-2">
+              Wikidata検索
+            </h1>
+            <p class="text-sm text-gray-500">
+              知識グラフから情報を検索
+            </p>
+          </header>
 
-            {/* 検索フォーム */}
-            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-              <div class="grid md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">検索キーワード</label>
-                  <input
-                    type="text"
-                    id="search-input"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="例：日本、アインシュタイン"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">検索モード</label>
-                  <select id="search-mode" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="label-full">完全一致</option>
-                    <option value="label-partial">部分一致</option>
-                    <option value="label-forward">前方一致</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">言語</label>
-                  <select id="search-lang" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+          {/* 検索フォーム（中央配置・Google風） */}
+          <div class="max-w-2xl mx-auto mb-8">
+            <div class="bg-white rounded-full border border-gray-200 hover:shadow-md transition duration-200 p-3">
+              <div class="flex items-center">
+                <i class="fas fa-search text-gray-400 ml-4 mr-3"></i>
+                <input
+                  type="text"
+                  id="search-input"
+                  class="flex-grow px-2 py-2 border-0 outline-none text-lg"
+                  placeholder="検索キーワードを入力（例：大阪電気通信大学、アインシュタイン）"
+                  autocomplete="off"
+                />
+                <div class="flex items-center space-x-2 mr-2">
+                  <select id="search-lang" class="px-3 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="ja">日本語</option>
                     <option value="en">English</option>
                   </select>
                 </div>
               </div>
-
-              <div class="flex flex-wrap gap-4 items-end">
-                <button
-                  id="search-btn"
-                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded transition duration-300"
-                >
-                  <i class="fas fa-search mr-2"></i>
-                  検索実行
-                </button>
-                <button
-                  id="clear-btn"
-                  class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded transition duration-300"
-                >
-                  <i class="fas fa-eraser mr-2"></i>
-                  クリア
-                </button>
-                <div id="loading" class="hidden flex items-center text-blue-600">
-                  <i class="fas fa-spinner fa-spin mr-2"></i>
-                  検索中...
-                </div>
-              </div>
             </div>
 
-            {/* 検索結果エリア */}
-            <div id="results-area" class="bg-white rounded-lg shadow-md p-6 hidden">
-              <h2 class="text-xl font-semibold mb-4 text-gray-800">
-                <i class="fas fa-list mr-2"></i>
-                検索結果
-              </h2>
-              <div id="results-content"></div>
-              <div id="pagination" class="mt-4 flex justify-center"></div>
+            {/* 検索ボタン */}
+            <div class="flex justify-center mt-6 space-x-3">
+              <button
+                id="search-btn"
+                class="bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 px-6 py-2 rounded text-sm transition duration-200"
+              >
+                Wikidata検索
+              </button>
+              <button
+                id="clear-btn"
+                class="bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 px-6 py-2 rounded text-sm transition duration-200"
+              >
+                クリア
+              </button>
             </div>
 
-            {/* エラー表示エリア */}
-            <div id="error-area" class="bg-red-50 border border-red-200 rounded-lg p-4 hidden">
-              <div class="flex items-center">
-                <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
-                <span class="text-red-700 font-medium">エラー</span>
+            {/* ローディング表示 */}
+            <div id="loading" class="hidden text-center mt-6">
+              <div class="inline-flex items-center px-4 py-2 bg-blue-50 rounded-lg">
+                <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                <span class="text-blue-600">検索中...</span>
               </div>
-              <div id="error-message" class="text-red-600 mt-2"></div>
             </div>
           </div>
+
+          {/* 検索結果エリア */}
+          <div id="results-area" class="max-w-4xl mx-auto hidden">
+            <div class="mb-4">
+              <h2 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">
+                検索結果
+              </h2>
+            </div>
+            <div id="results-content"></div>
+            <div id="pagination" class="mt-6 text-center"></div>
+          </div>
+
+          {/* エラー表示エリア */}
+          <div id="error-area" class="max-w-2xl mx-auto bg-red-50 border border-red-200 rounded-lg p-4 hidden">
+            <div class="flex items-center">
+              <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
+              <span class="text-red-700 font-medium">エラー</span>
+            </div>
+            <div id="error-message" class="text-red-600 mt-2"></div>
+          </div>
+
+          {/* フッター */}
+          <footer class="text-center py-8 text-xs text-gray-400">
+            <div class="space-x-4">
+              <span>Powered by Wikidata</span>
+              <span>•</span>
+              <span>Built with Hono + Cloudflare</span>
+            </div>
+          </footer>
         </div>
       </div>
     </div>
   )
 })
+
+
 
 // API: Wikidata検索
 app.get('/api/search', async (c) => {
@@ -210,7 +156,7 @@ app.get('/api/search', async (c) => {
   }
 })
 
-// API: エンティティ詳細取得
+// API: エンティティ詳細取得（日本語ラベル優先）
 app.get('/api/entity/:id', async (c) => {
   try {
     const entityId = c.req.param('id')
@@ -220,20 +166,46 @@ app.get('/api/entity/:id', async (c) => {
       return c.json({ error: '無効なエンティティIDです' }, 400)
     }
 
-    // SPARQL クエリでエンティティの詳細情報を取得
+    // 基本情報と主要プロパティを取得するSPARQLクエリ
     const sparqlQuery = `
-      SELECT DISTINCT ?prop ?propLabel ?value ?valueLabel WHERE {
+      SELECT DISTINCT ?prop ?propLabel ?propJaLabel ?value ?valueLabel ?valueJaLabel ?valueDescription WHERE {
         wd:${entityId} ?prop ?value .
         ?property wikibase:directClaim ?prop .
-        ?property rdfs:label ?propLabel .
-        FILTER(LANG(?propLabel) = "${lang}" || LANG(?propLabel) = "en")
-        OPTIONAL {
-          ?value rdfs:label ?valueLabel .
-          FILTER(LANG(?valueLabel) = "${lang}" || LANG(?valueLabel) = "en")
-        }
+        
+        # プロパティラベル（日本語優先）
+        OPTIONAL { ?property rdfs:label ?propJaLabel . FILTER(LANG(?propJaLabel) = "ja") }
+        OPTIONAL { ?property rdfs:label ?propLabel . FILTER(LANG(?propLabel) = "en") }
+        
+        # 値のラベル（日本語優先）
+        OPTIONAL { ?value rdfs:label ?valueJaLabel . FILTER(LANG(?valueJaLabel) = "ja") }
+        OPTIONAL { ?value rdfs:label ?valueLabel . FILTER(LANG(?valueLabel) = "en") }
+        OPTIONAL { ?value schema:description ?valueDescription . FILTER(LANG(?valueDescription) = "ja") }
+        
+        # 重要なプロパティに絞る
+        FILTER(?prop IN (
+          wdt:P31,    # instance of (分類)
+          wdt:P279,   # subclass of (上位クラス)
+          wdt:P17,    # country (国)
+          wdt:P131,   # located in (所在地)
+          wdt:P19,    # place of birth (出生地)
+          wdt:P20,    # place of death (死去地)
+          wdt:P27,    # country of citizenship (国籍)
+          wdt:P106,   # occupation (職業)
+          wdt:P569,   # date of birth (生年月日)
+          wdt:P570,   # date of death (没年月日)
+          wdt:P18,    # image (画像)
+          wdt:P154,   # logo image (ロゴ)
+          wdt:P625,   # coordinate location (座標)
+          wdt:P856,   # official website (公式サイト)
+          wdt:P571,   # inception (設立年)
+          wdt:P576,   # dissolved (解散年)
+          wdt:P1416,  # affiliation (所属)
+          wdt:P108    # employer (雇用者)
+        ))
         FILTER(!isBlank(?value))
       }
-      LIMIT 50
+      ORDER BY ?prop
+      LIMIT 30
     `
 
     const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparqlQuery)}&format=json`
