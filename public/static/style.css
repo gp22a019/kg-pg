@@ -103,6 +103,44 @@ body {
   transform: translateY(-1px);
 }
 
+/* インライン展開のフル表示スタイル */
+.inline-entity-full-display {
+  max-height: 500px;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
+  border-left: 4px solid #3b82f6;
+}
+
+.inline-entity-content {
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.inline-entity-content .property-table {
+  margin: 0;
+}
+
+.inline-entity-content .property-table td {
+  padding: 8px 12px;
+}
+
+.inline-entity-content .property-table .property-label-cell {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  font-size: 12px;
+}
+
+.inline-entity-content .property-table img {
+  max-width: 80px;
+  max-height: 60px;
+}
+
+/* インライン表示の背景色 */
+.bg-blue-25 {
+  background-color: rgba(239, 246, 255, 0.5);
+}
+
 /* プロパティテーブルのスタイル改善 */
 .property-table {
   border-collapse: separate;

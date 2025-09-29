@@ -716,10 +716,12 @@ class KGSearch {
                 ${this.escapeHtml(valueText)}
               </button>
               ${valueDescription ? `<span class="text-gray-500 text-xs ml-2">(${this.escapeHtml(valueDescription)})</span>` : ''}
-              <div id="${uniqueId}" class="hidden inline-entity-expand mt-2 ml-4 p-3 bg-gray-50 border-l-4 border-blue-400 rounded shadow-sm">
-                <div class="flex items-center mb-2">
-                  <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
-                  <span class="text-blue-600 text-xs">詳細情報を読み込み中...</span>
+              <div id="${uniqueId}" class="hidden inline-entity-expand mt-2">
+                <div class="inline-entity-full-display border-t border-blue-200 bg-blue-25 p-4 rounded-b-lg">
+                  <div class="flex items-center mb-2">
+                    <i class="fas fa-spinner fa-spin text-blue-600 mr-2"></i>
+                    <span class="text-blue-600 text-sm">詳細情報を読み込み中...</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -841,79 +843,43 @@ class KGSearch {
     }
   }
 
-  // インライン表示用に詳細情報をフォーマット
+  // インライン表示用に詳細情報をフォーマット（フル表示版）
   displayInlineEntityDetails(entityId, properties, containerId) {
     const container = document.getElementById(containerId)
     if (!container) return
     
-    // 重要なプロパティのみを表示（スペース節約のため）
-    const importantProperties = this.filterImportantProperties(properties)
-    const formattedProperties = this.formatInlineProperties(importantProperties)
+    // 1段階目と同じフル表示を使用（画像やその他情報も含む）
+    const formattedProperties = this.formatEntityPropertiesInline(properties)
     
     container.innerHTML = `
-      <div class="text-xs">
-        <div class="font-medium text-gray-700 mb-2">
-          <i class="fas fa-info-circle mr-1"></i>
-          ${entityId} の詳細情報
+      <div class="inline-entity-full-display border-t border-blue-200 bg-blue-25 p-4 rounded-b-lg">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-medium text-blue-800 text-sm">
+            <i class="fas fa-info-circle mr-2"></i>
+            ${entityId} の詳細情報
+          </div>
+          <div class="flex space-x-2">
+            <a href="https://www.wikidata.org/wiki/${entityId}" target="_blank" 
+               class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 bg-blue-100 rounded">
+              <i class="fas fa-external-link-alt mr-1"></i>
+              Wikidata
+            </a>
+            <button 
+              onclick="kgSearch.toggleInlineEntity('${entityId}', '${containerId}')"
+              class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1 bg-blue-100 rounded">
+              <i class="fas fa-times mr-1"></i>
+              閉じる
+            </button>
+          </div>
         </div>
-        ${formattedProperties}
-        <div class="mt-2 pt-2 border-t border-gray-200">
-          <a href="https://www.wikidata.org/wiki/${entityId}" target="_blank" 
-             class="text-blue-500 hover:text-blue-700 text-xs">
-            <i class="fas fa-external-link-alt mr-1"></i>
-            Wikidataで詳細を見る
-          </a>
+        <div class="inline-entity-content">
+          ${formattedProperties}
         </div>
       </div>
     `
   }
 
-  // 重要なプロパティをフィルタリング（インライン表示用）
-  filterImportantProperties(properties) {
-    if (!properties || properties.length === 0) return []
-    
-    // 表示優先度の高いプロパティID
-    const importantPropIds = ['P31', 'P279', 'P17', 'P131', 'P19', 'P20', 'P27', 'P106', 'P569', 'P570']
-    
-    const importantProps = properties.filter(prop => {
-      const propId = this.extractPropertyId(prop.prop?.value)
-      return propId && importantPropIds.includes(propId)
-    })
-    
-    // 最大5件まで表示
-    return importantProps.slice(0, 5)
-  }
 
-  // インライン表示用の簡潔なフォーマット
-  formatInlineProperties(properties) {
-    if (!properties || properties.length === 0) {
-      return '<div class="text-xs text-gray-500 italic">基本情報がありません</div>'
-    }
-
-    const rows = properties.map(prop => {
-      // 改良されたプロパティ表示ラベルを使用
-      const propLabel = this.getPropertyDisplayLabel(prop)
-
-      // 値を取得（日本語優先）
-      let valueText = prop.valueJaLabel?.value || prop.valueLabel?.value || prop.value?.value || 'Unknown'
-      
-      // URLの場合は短縮表示
-      if (valueText.startsWith('http')) {
-        valueText = valueText.length > 25 ? valueText.substring(0, 22) + '...' : valueText
-      }
-
-      return `
-        <div class="flex items-start py-1.5 text-xs border-b border-gray-100 last:border-b-0">
-          <span class="text-gray-600 font-medium bg-gray-100 px-2 py-1 rounded text-xs mr-3 flex-shrink-0" style="min-width: 80px; max-width: 100px;">
-            ${this.escapeHtml(propLabel)}
-          </span>
-          <span class="text-gray-800 flex-1 pt-1">${this.escapeHtml(valueText)}</span>
-        </div>
-      `
-    }).join('')
-
-    return `<div class="space-y-0 bg-white border border-gray-200 rounded">${rows}</div>`
-  }
 
   clearResults() {
     const searchInput = document.getElementById('search-input')
